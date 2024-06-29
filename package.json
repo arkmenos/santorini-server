@@ -1,0 +1,22 @@
+{
+  "name": "santorini-server",
+  "private": true,
+  "version": "0.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon",
+    "start": "node",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "vite": "^5.3.1"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
