@@ -10,7 +10,7 @@ const app = express();
 app.use((req, res, next) => {
     res.setHeader(
       "Access-Control-Allow-Origin",
-      "https://santorini-app.onrender.com"
+      "https://santorini-app.onrender.com/"
     );
     res.setHeader(
         "Access-Control-Allow-Methods",
@@ -44,11 +44,12 @@ const GamesState = {
 
 const io = new Server(expressServer, {
     cors: {
-        origin:  "https://santorini-app.onrender.com",
+        origin:  "https://santorini-app.onrender.com/",
         methods:["GET", "POST"],
         allowedHeaders:["Access-Control-Allow-Origin"],
         credentials: true
-    }
+    },
+    transports:['websocket']
 })
 
 io.on('connection', socket => {
@@ -85,7 +86,8 @@ io.on('connection', socket => {
                 socket.emit('updatePlayer', spotAvailable)
             }
 
-            const user = addUser(socket.id, name, roomId, type ? type :spotAvailable)                     
+            const user = addUser(socket.id, name, roomId, type ? type :spotAvailable)    
+            console.log(user)                 
             socket.join(user.roomId)
             socket.emit('getUsersInRoom', roomUsers)
             socket.broadcast.to(roomId).emit('userJoined', {name: name, roomId:user.roomId, type: type ? type :spotAvailable})
