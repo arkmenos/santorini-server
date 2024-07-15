@@ -49,7 +49,8 @@ const io = new Server(expressServer, {
         allowedHeaders:["Access-Control-Allow-Origin"],
         credentials: true
     },
-    transports:['websocket']
+    transports:['websocket', 'polling', 'webtransport'],
+    secure: true
 })
 
 io.on('connection', socket => {
