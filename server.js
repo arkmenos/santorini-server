@@ -7,23 +7,23 @@ const PORT = process.env.PORT || 4000
 const ADMIN = "Admin"
 
 const app = express();
-app.use((req, res, next) => {
-    res.setHeader(
-      "Access-Control-Allow-Origin",
-      "https://santorini-app.onrender.com/"
-    );
-    res.setHeader(
-        "Access-Control-Allow-Methods",
-        "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,CONNECT,TRACE"
-      );
-      res.setHeader(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, X-Content-Type-Options, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
-      );
-      res.setHeader("Access-Control-Allow-Credentials", true);
-      res.setHeader("Access-Control-Allow-Private-Network", true);
-    next();
-})
+// app.use((req, res, next) => {
+//     res.setHeader(
+//       "Access-Control-Allow-Origin",
+//       "https://santorini-app.onrender.com/"
+//     );
+//     res.setHeader(
+//         "Access-Control-Allow-Methods",
+//         "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,CONNECT,TRACE"
+//       );
+//       res.setHeader(
+//         "Access-Control-Allow-Headers",
+//         "Content-Type, Authorization, X-Content-Type-Options, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+//       );
+//       res.setHeader("Access-Control-Allow-Credentials", true);
+//       res.setHeader("Access-Control-Allow-Private-Network", true);
+//     next();
+// })
 
 app.use(cors(corsOptions));
 
@@ -44,7 +44,7 @@ const GamesState = {
 
 const io = new Server(expressServer, {
     cors: {
-        origin:  "https://santorini-app.onrender.com/",
+        origin:  "http://localhost:5173",
         methods:["GET", "POST"],
         allowedHeaders:["Access-Control-Allow-Origin"],
         credentials: true
@@ -58,8 +58,8 @@ io.on('connection', socket => {
 
     socket.emit('message', buildMsg(ADMIN, "Welcome to Arc's Santorini App!"))
 
-    socket.on('createRoom', ({name, roomId, type}) =>{
-        const user = addUser(socket.id, name, roomId, type)
+    socket.on('createRoom', ({name, roomId, type, identifier}) =>{
+        const user = addUser(socket.id, name, roomId, type, identifier)
 
         console.log(user)
         socket.join(user.roomId)
@@ -74,7 +74,7 @@ io.on('connection', socket => {
         console.log(err.context);  // some additional error context
       });
 
-    socket.on('enterRoom',  ({name, roomId, type}) =>{
+    socket.on('enterRoom',  ({name, roomId, type, identifier}) =>{
         const roomUsers = [...getUsersInRoom(roomId)]
 
         if(roomUsers.length === 0){
@@ -84,14 +84,16 @@ io.on('connection', socket => {
             
             if(!type && spotAvailable){
                 //Rejoin as spectator             
-                socket.emit('updatePlayer', spotAvailable)
+                socket.emit('updatePlayer', {name:name, roomId:roomId, 
+                    type:spotAvailable, identifier: identifier})
             }
 
-            const user = addUser(socket.id, name, roomId, type ? type :spotAvailable)    
+            const user = addUser(socket.id, name, roomId, type ? type :spotAvailable, identifier)    
             console.log(user)                 
             socket.join(user.roomId)
             socket.emit('getUsersInRoom', roomUsers)
-            socket.broadcast.to(roomId).emit('userJoined', {name: name, roomId:user.roomId, type: type ? type :spotAvailable})
+            socket.broadcast.to(roomId).emit('userJoined', {name: name, roomId:user.roomId, 
+                type: type ? type :spotAvailable, identifier: identifier})
             // if(type === "S"){
                 // const bstate = GamesState.boardStates.find(b=> b.roomId === roomId)
                 // socket.emit('getBoardState', )
@@ -110,10 +112,70 @@ io.on('connection', socket => {
     socket.on('startGame', () =>{
         console.log("game started")
         const user = getUser(socket.id)
+        const allPlayers = getUsersInRoom(user.roomId)
+        let powers = ""
+        const playerX = allPlayers.filter(p => p.type === "X")
+        const playerY = allPlayers.filter(p => p.type === "Y")
+        if(playerX.identifier) powers += playerX.identifier + "/"
+        if(playerY.identifier) powers += playerY.identifier
+        if(allPlayers.length === 3){
+            const playerZ = allPlayers.filter(p => p.type === "Z")
+            if(playerZ.identifier) powers += "/" + playerZ.identifier
+        }
+        if(powers === "") powers = "-"
         socket.broadcast.to(user.roomId).emit('startGame')
-        addBoardState(user.roomId, "5/5/5/5/5 X - - L22/M18/S14/D18 - - 1")
+        addBoardState(user.roomId, "5/5/5/5/5 X - " + powers + " L22/M18/S14/D18 - - 1")
+        console.log("game started" )
+        console.log("5/5/5/5/5 X - " + powers + " L22/M18/S14/D18 - - 1")
     })
 
+    socket.on('pickPower', () =>{
+        
+        const user = getUser(socket.id)
+        socket.broadcast.to(user.roomId).emit('pickPower')
+    })
+
+    socket.on('X-PowerPick', () =>{
+        console.log("x Pick turn")
+        const user = getUser(socket.id)
+        socket.broadcast.to(user.roomId).emit('X-PowerPick')
+    })
+
+    socket.on('Y-PowerPick', () =>{
+        console.log("y Pick turn")
+        const user = getUser(socket.id)
+        socket.broadcast.to(user.roomId).emit('Y-PowerPick')
+    })
+
+    socket.on('Z-PowerPick', () =>{
+        console.log("z Pick turn")
+        const user = getUser(socket.id)
+        socket.broadcast.to(user.roomId).emit('Z-PowerPick')
+    })
+
+    socket.on('updatePlayerPower', ({name, roomId, type, identifier}) =>{
+        console.log("updating Player Power", name, roomId, type, identifier)
+        // const roomUsers = [...getUsersInRoom(playerInfo.roomId)]
+        // if( playerInfo && isPowerPicked(playerInfo.identifier, roomUsers)){
+        //     socket.emit('updatePlayer', {name: playerInfo.name, roomId: playerInfo.roomId,
+        //         type:playerInfo.type, identifier: null
+        //     })
+        // }
+        const user = getUser(socket.id)
+        if(user.identifier !== identifier){
+            const roomUsers = [...getUsersInRoom(user.roomId)]
+            const powerInUse = roomUsers.find(u=> u.type != type && u.identifier === identifier)
+            if(powerInUse) {
+                socket.broadcast.to(user.roomId).emit('updatePlayerPower', {name:name, roomId:roomId, 
+                type:spotAvailable, identifier: null})
+                addUser(user.id, name, roomId, type, null)
+            }
+            else{
+                addUser(user.id, name, roomId, type, identifier)
+                socket.broadcast.to(user.roomId).emit('updatePlayerPower', {name, roomId, type, identifier})            
+            }
+        }
+    })
     socket.on('takeTurn', turn => {
         console.log('takeTurn')
         const user = getUser(socket.id)
@@ -162,8 +224,8 @@ function buildMsg(name, text){
         }).format(new Date())
     }
 }
-function addUser(id, name, roomId, type){
-    const user = {id, name, roomId, type}
+function addUser(id, name, roomId, type, identifier){
+    const user = {id, name, roomId, type, identifier}
     
     GamesState.setUsers([...GamesState.users.filter( user => user.id !==id), user])
     return user
@@ -177,6 +239,10 @@ function playerSpotAvailable(roomUsers){
     if(!playerThree) return "Z"
 
     return "S"
+}
+
+function isPowerPicked(power, roomUsers){
+    return roomUsers.find(user => user.identifier === power)
 }
 
 function findOpponent(id) {
